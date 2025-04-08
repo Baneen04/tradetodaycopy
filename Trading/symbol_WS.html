@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Live Data</title>
+</head>
+<body>
+    <h2>Live Binance Data</h2>
+
+    <!-- Symbol Input -->
+    <label for="symbol">Enter Symbols (comma-separated): </label>
+    <input type="text" id="symbol" placeholder="e.g., BTCUSDT,ETHUSDT">
+    <button onclick="connectWebSocket()">Connect</button>
+
+    <h3>Real-Time Data:</h3>
+    <pre id="data"></pre>
+
+    <script>
+        let socket = null;
+
+        function connectWebSocket() {
+            const symbolInput = document.getElementById("symbol").value.trim();
+            if (!symbolInput) {
+                alert("Please enter a symbol!");
+                return;
+            }
+
+            // Close existing WebSocket connection if any
+            if (socket) {
+                socket.close();
+            }
+
+            // Create a new WebSocket connection with the selected symbol
+            socket = new WebSocket(`ws://127.0.0.1:8000/ws/binance-data/?symbol=${symbolInput.toUpperCase()}`);
+
+            socket.onmessage = function(event) {
+                let data = JSON.parse(event.data);
+                document.getElementById("data").innerText = JSON.stringify(data, null, 2);
+                console.log("Live WebSocket Data:", data);
+            };
+
+            socket.onopen = function() {
+                console.log("WebSocket connected for symbol:", symbolInput);
+            };
+
+            socket.onclose = function() {
+                console.log("WebSocket disconnected");
+            };
+
+            socket.onerror = function(error) {
+                console.log("WebSocket Error:", error);
+            };
+        }
+    </script>
+
+</body>
+</html>

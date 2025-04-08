@@ -1,0 +1,58 @@
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC Live Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1 style="text-align:center;">BTC/USDT Live Price Chart</h1>
+    <div>{{ chart_html|safe }}</div>
+</body>
+</html>  {% endcomment %}
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC Live Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1 style="text-align:center;">BTC/USDT Live Price Chart</h1>
+
+    <!-- Chart -->
+    <div>{{ chart_html|safe }}</div>
+
+    <!-- Predictions Section -->
+    <div style="text-align:center; margin-top:20px;">
+        <h2>Predictions</h2>
+        <table border="1" align="center" style="border-collapse: collapse; width: 60%;">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Predicted Price (USDT)</th>
+                    <th>Confidence Interval (±)</th>
+                    <th>Confidence Percentage (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pred in predictions %}
+                    <tr>
+                        <td>{{ pred.timestamp }}</td>
+                        <td>${{ pred.price }}</td>
+                        <td>±${{ pred.confidence_interval }}</td>
+                        <td>{{ pred.confidence_percentage }}%</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Sparkline Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Load Chart.js -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        canvas {
+            width: 100px !important;
+            height: 40px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align: center;">Crypto Sparkline Charts</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Price (USD)</th>
+                <th>Price Trend</th>
+            </tr>
+        </thead>
+        <tbody id="crypto-table">
+            <!-- Data will be inserted here dynamically -->
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("http://127.0.0.1:8000/sparklines/") // Update with your API URL
+                .then(response => response.json())
+                .then(data => {
+                    console.log("API Response:", data); // Debugging
+                    const tableBody = document.getElementById("crypto-table");
+
+                    data.forEach(coin => {
+                        const row = document.createElement("tr");
+
+                        // Symbol
+                        const symbolCell = document.createElement("td");
+                        symbolCell.textContent = coin.symbol;
+                        row.appendChild(symbolCell);
+
+                        // Price
+                        const priceCell = document.createElement("td");
+                        priceCell.textContent = `$${parseFloat(coin.price).toFixed(2)}`;
+                        row.appendChild(priceCell);
+
+                        // Price Trend (Sparkline)
+                        const trendCell = document.createElement("td");
+                        const canvas = document.createElement("canvas");
+                        canvas.width = 100;
+                        canvas.height = 40;
+                        trendCell.appendChild(canvas);
+                        row.appendChild(trendCell);
+
+                        tableBody.appendChild(row);
+
+                        // Get color based on trend
+                        const firstPrice = coin.price_history[0];
+                        const lastPrice = coin.price_history[coin.price_history.length - 1];
+                        const isBullish = lastPrice > firstPrice;
+
+                        // Chart.js Sparkline
+                        new Chart(canvas.getContext("2d"), {
+                            type: "line",
+                            data: {
+                                labels: coin.price_history.map((_, i) => i),
+                                datasets: [{
+                                    data: coin.price_history,
+                                    borderColor: isBullish ? "green" : "red", // Green for up, Red for down
+                                    backgroundColor: isBullish ? "rgba(0, 255, 0, 0.2)" : "rgba(255, 0, 0, 0.2)", // Shaded area
+                                    fill: true,
+                                    tension: 0.3, // Smooth curve
+                                    pointRadius: 0, // Hide points
+                                    borderWidth: 1.5
+                                }]
+                            },
+                            options: {
+                                responsive: false,
+                                scales: {
+                                    x: { display: false },
+                                    y: { display: false }
+                                },
+                                elements: { line: { tension: 0.3 } },
+                                plugins: { legend: { display: false } }
+                            }
+                        });
+                    });
+                })
+                .catch(error => console.error("Error fetching sparklines:", error));
+        });
+    </script>
+
+</body>
+</html>

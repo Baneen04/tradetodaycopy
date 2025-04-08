@@ -1,0 +1,31 @@
+###Prediction API
+
+http://127.0.0.1:8000/predict/15min/?symbol=BTCUSDT
+http://127.0.0.1:8000/predict/30min/?symbol=BNBUSDT
+http://127.0.0.1:8000/predict/1hour/?symbol=BNBUSDT
+
+
+####Stop Loss API
+
+http://127.0.0.1:8000/sl-tp15/?symbol=BTCUSDT
+http://127.0.0.1:8000/sl-tp30/?symbol=BTCUSDT
+http://127.0.0.1:8000/sl-tp1h/?symbol=BTCUSDT
+
+#####Fear Greed API
+
+http://127.0.0.1:8000/fg_chart/
+
+###Market Prediction API
+
+http://127.0.0.1:8000/market-index/
+
+
+#####Websockt API
+
+##LIVE BINANCE DATA WITH historical data
+
+ws://127.0.0.1:8000/ws/binance/?symbol=ETHUSDT&timeframes=1m
+
+##Biance Data for 24h, 1h and 4h change and 24h_voloumn
+
+ws://127.0.0.1:8000/ws/binance-data/

@@ -1,0 +1,11 @@
+symbol,predicted_change,signal,last_price
+XRPUSDT,2.8,Buy,160
+DOGEUSDT,1.2,Buy,150
+MATICUSDT,0.4,Buy,190
+SOLUSDT,0.3,Buy,140
+ADAUSDT,-0.2,Sell,130
+AVAXUSDT,-0.6,Sell,180
+BNBUSDT,-0.9,Sell,120
+DOTUSDT,-1.1,Sell,170
+ETHUSDT,-1.8,Sell,110
+BTCUSDT,-3.5,Sell,100

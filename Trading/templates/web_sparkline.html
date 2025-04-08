@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Sparkline Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Load Chart.js -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        canvas {
+            width: 100px !important;
+            height: 40px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align: center;">Crypto Sparkline Charts</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Price (USD)</th>
+                <th>Price Trend</th>
+            </tr>
+        </thead>
+        <tbody id="crypto-table">
+            <!-- Data will be inserted here dynamically -->
+        </tbody>
+    </table>
+
+    <script>
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws/binance-data/"); // WebSocket URL
+        const tableBody = document.getElementById("crypto-table");
+        const charts = {}; // Store Chart.js instances
+
+        // Function to update or create a new row
+        function updateRow(coin) {
+            let row = document.getElementById(`row-${coin.symbol}`);
+
+            if (!row) {
+                row = document.createElement("tr");
+                row.id = `row-${coin.symbol}`;
+
+                // Symbol
+                const symbolCell = document.createElement("td");
+                symbolCell.textContent = coin.symbol;
+                row.appendChild(symbolCell);
+
+                // Price
+                const priceCell = document.createElement("td");
+                priceCell.id = `price-${coin.symbol}`;
+                priceCell.textContent = `$${parseFloat(coin.price).toFixed(2)}`;
+                row.appendChild(priceCell);
+
+                // Price Trend (Sparkline)
+                const trendCell = document.createElement("td");
+                const canvas = document.createElement("canvas");
+                canvas.id = `chart-${coin.symbol}`;
+                canvas.width = 100;
+                canvas.height = 40;
+                trendCell.appendChild(canvas);
+                row.appendChild(trendCell);
+
+                tableBody.appendChild(row);
+
+                // Create Sparkline Chart
+                createSparkline(coin.symbol, coin.price_history);
+            } else {
+                document.getElementById(`price-${coin.symbol}`).textContent = `$${parseFloat(coin.price).toFixed(2)}`;
+                updateSparkline(coin.symbol, coin.price);
+            }
+        }
+
+        // Function to create Sparkline Chart
+        function createSparkline(symbol, priceHistory) {
+            const canvas = document.getElementById(`chart-${symbol}`);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext("2d");
+            const isBullish = priceHistory[priceHistory.length - 1] > priceHistory[0];
+
+            charts[symbol] = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: priceHistory.map((_, i) => i),
+                    datasets: [{
+                        data: priceHistory,
+                        borderColor: isBullish ? "green" : "red",
+                        backgroundColor: isBullish ? "rgba(0, 255, 0, 0.2)" : "rgba(255, 0, 0, 0.2)",
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1.5
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    elements: { line: { tension: 0.3 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Function to update Sparkline
+        function updateSparkline(symbol, newPrice) {
+            if (charts[symbol]) {
+                const chart = charts[symbol];
+                if (chart.data.datasets[0].data.length >= 30) { // Keep last 30 points
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.data.datasets[0].data.push(newPrice);
+                chart.update();
+            }
+        }
+
+        // Fetch Initial Data
+        fetch("http://127.0.0.1:8000/sparklines/")
+            .then(response => response.json())
+            .then(data => {
+                console.log("API Response:", data);
+                data.forEach(updateRow);
+            })
+            .catch(error => console.error("Error fetching sparklines:", error));
+
+        // WebSocket Message Handling
+        ws.onmessage = function (event) {
+            const liveData = JSON.parse(event.data);
+            updateRow(liveData);
+        };
+
+        ws.onclose = function () {
+            console.log("WebSocket Closed.");
+        };
+
+        ws.onerror = function (error) {
+            console.error("WebSocket Error:", error);
+        };
+    </script>
+
+</body>
+</html>

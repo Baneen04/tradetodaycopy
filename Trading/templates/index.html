@@ -1,0 +1,93 @@
+{% comment %} <!DOCTYPE html>
+<html>
+<head>
+    <title>Live BTC Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>BTC/USDT Live Candlestick Chart with 1-Hour Prediction</h1>
+    <div id="chart"></div>
+    <script>
+        var socket = new WebSocket("ws://127.0.0.1:8000/ws/btc_chart/");
+
+        socket.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+
+            var trace1 = {
+                x: data.timestamps,
+                y: data.close_prices,
+                mode: 'lines',
+                name: 'Live Prices'
+            };
+
+            var trace2 = {
+                x: data.future_time,
+                y: data.predicted_prices,
+                mode: 'lines+markers',
+                name: 'Predicted Prices',
+                line: {color: 'red'}
+            };
+
+            var layout = {
+                title: 'BTC/USDT Live Chart with 1-Hour Prediction',
+                xaxis: { title: 'Time' },
+                yaxis: { title: 'Price (USDT)' }
+            };
+
+            Plotly.newPlot('chart', [trace1, trace2], layout);
+        };
+    </script>
+</body>
+</html> {% endcomment %}
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live BTC Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>BTC/USDT Live Candlestick Chart with 1-Hour Prediction</h1>
+    <div id="chart"></div>
+    <script>
+        var socket = new WebSocket("ws://127.0.0.1:8000/ws/btc_chart/");
+
+        socket.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+
+            // Trace for Candlestick data (Previous 1 Hour)
+            var trace1 = {
+                x: data.timestamps,
+                open: data.open_prices,
+                high: data.high_prices,
+                low: data.low_prices,
+                close: data.close_prices,
+                type: 'candlestick',
+                name: 'Live Candlestick',
+                increasing: {line: {color: 'green'}},
+                decreasing: {line: {color: 'red'}},
+                whiskerwidth: 1
+            };
+
+            // Trace for Predicted Price data (Future 1 Hour)
+            var trace2 = {
+                x: data.future_time,
+                y: data.predicted_prices,
+                mode: 'lines+markers',
+                name: 'Predicted Prices',
+                line: {color: 'red'},
+                marker: {size: 8}
+            };
+
+            var layout = {
+                title: 'BTC/USDT Live Chart with 1-Hour Prediction',
+                xaxis: { title: 'Time', rangeslider: {visible: false} },
+                yaxis: { title: 'Price (USDT)' }
+            };
+
+            Plotly.newPlot('chart', [trace1, trace2], layout);
+        };
+    </script>
+</body>
+</html>

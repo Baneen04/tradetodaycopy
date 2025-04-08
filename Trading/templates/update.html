@@ -1,0 +1,100 @@
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC/USDT Live Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <h2>BTC/USDT Live Price Chart</h2>
+    <canvas id="btcChart"></canvas>
+
+    <h3>Latest Prices</h3>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Open</th>
+                <th>High</th>
+                <th>Low</th>
+                <th>Close</th>
+            </tr>
+        </thead>
+        <tbody id="priceTable"></tbody>
+    </table>
+
+    <script>
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws/binance/?symbol=BTCUSDT&timeframe=1m");
+        console.log('fetching data')
+        const priceTable = document.getElementById("priceTable");
+        const ctx = document.getElementById("btcChart").getContext("2d");
+
+        let chartData = { labels: [], datasets: [{ label: "BTC Price", data: [], borderColor: "blue", borderWidth: 1 }] };
+        let btcChart = new Chart(ctx, { type: "line", data: chartData, options: { responsive: true, maintainAspectRatio: false } });
+
+        ws.onopen = () => console.log("✅ WebSocket Connected");
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.historical) {
+                // Load historical data into chart
+                data.historical.forEach(entry => updateChart(entry.timestamp, entry.close));
+            } else {
+                // Live updates
+                updateChart(data.timestamp, data.close);
+            }
+        };
+
+        ws.onerror = (err) => console.error("❌ WebSocket Error:", err);
+        ws.onclose = () => console.warn("⚠️ WebSocket Disconnected");
+
+        function updateChart(timestamp, price) {
+            const time = new Date(timestamp).toLocaleTimeString();
+
+            // Update Table
+            let row = priceTable.insertRow(0);
+            row.insertCell(0).textContent = time;
+            row.insertCell(1).textContent = price;
+
+            // Update Chart
+            if (chartData.labels.length > 50) {
+                chartData.labels.shift();
+                chartData.datasets[0].data.shift();
+            }
+            chartData.labels.push(time);
+            chartData.datasets[0].data.push(price);
+            btcChart.update();
+        }
+    </script>
+
+</body>
+</html> {% endcomment %}
+
+<div id="chart"></div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+    var socket = new WebSocket("ws://127.0.0.1:8000/ws/update/?symbol=BTCUSDT&timeframes=1m");  // Replace with your WebSocket URL
+
+    socket.onmessage = function(event) {
+        let data = JSON.parse(event.data);
+        console.log("Received WebSocket Data:", data);
+
+        // Process data into Plotly format
+        let trace = {
+            x: data.timestamps,  // Assuming you receive timestamps
+            y: data.prices,  // Assuming you receive prices
+            type: 'scatter'
+        };
+
+        let layout = {
+            title: 'BTC/USDT Price',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Price' }
+        };
+
+        Plotly.newPlot('chart', [trace], layout); // Update chart dynamically
+    };
+</script>

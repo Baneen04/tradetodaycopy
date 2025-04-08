@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC/USDT Live Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>BTC/USDT Live Chart</h1>
+    <div id="chart"></div>
+
+    <script>
+        var chart = JSON.parse('{{ chart_json|escapejs }}');  // Parse JSON from Django
+        Plotly.newPlot('chart', chart.data, chart.layout);
+    </script>
+</body>
+</html>

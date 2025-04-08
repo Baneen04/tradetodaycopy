@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTCUSDT Candlestick Chart</title>
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+    <h2>BTCUSDT Candlestick Chart</h2>
+    <div id="candlestick-chart" style="width: 100%; height: 600px;"></div>
+
+    <script>
+        const socket = new WebSocket("ws://localhost:8000/ws/binance/?symbol=BTCUSDT&timeframes=1m");
+
+        let historicalData = [];
+
+        socket.onopen = () => console.log("WebSocket Connected ✅");
+        socket.onerror = (error) => console.error("WebSocket Error:", error);
+        socket.onclose = () => console.log("WebSocket Closed ❌");
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log("Received Data:", data);
+
+            let now = new Date();
+            let oneDayAgo = now.getTime() - (24 * 60 * 60 * 1000); // Last 24 hours
+
+            if (data.historical_data) {
+                let timeframe = "1m";  // Change if needed
+                let klineData = data.historical_data[timeframe];
+
+                historicalData = klineData.map(k => ({
+                    x: new Date(k.date).toISOString(), 
+                    open: parseFloat(k.open), 
+                    high: parseFloat(k.high), 
+                    low: parseFloat(k.low), 
+                    close: parseFloat(k.close)
+                }));
+
+                // Filter data to keep only last 24 hours
+                historicalData = historicalData.filter(k => new Date(k.x).getTime() >= oneDayAgo);
+
+                Plotly.newPlot("candlestick-chart", [{
+                    x: historicalData.map(k => k.x),
+                    open: historicalData.map(k => k.open),
+                    high: historicalData.map(k => k.high),
+                    low: historicalData.map(k => k.low),
+                    close: historicalData.map(k => k.close),
+                    type: "candlestick",
+                    increasing: { line: { color: "green" } }, 
+                    decreasing: { line: { color: "red" } }
+                }], { 
+                    title: "BTCUSDT Live Candlestick Chart (Last 24 Hours)",
+                    xaxis: { type: "date", title: "Time" },
+                    yaxis: { title: "Price (USDT)" }
+                });
+
+            } else {
+                // Append new data (real-time updates)
+                let newCandle = {
+                    x: new Date(data.date).toISOString(), 
+                    open: parseFloat(data.open), 
+                    high: parseFloat(data.high), 
+                    low: parseFloat(data.low), 
+                    close: parseFloat(data.close)
+                };
+
+                historicalData.push(newCandle);
+
+                // Keep only the last 24 hours of data
+                historicalData = historicalData.filter(k => new Date(k.x).getTime() >= oneDayAgo);
+
+                Plotly.update("candlestick-chart", {
+                    x: [historicalData.map(k => k.x)],
+                    open: [historicalData.map(k => k.open)],
+                    high: [historicalData.map(k => k.high)],
+                    low: [historicalData.map(k => k.low)],
+                    close: [historicalData.map(k => k.close)]
+                }, [0]);
+            }
+        };
+    </script>
+</body>
+</html>

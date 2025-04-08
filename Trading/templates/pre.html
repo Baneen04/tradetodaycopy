@@ -1,0 +1,168 @@
+{% comment %} <!DOCTYPE html>
+<html>
+<head>
+    <title>BTC/USDT Live Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        var socket;
+        var lastPrice = null;
+
+        function connectWebSocket() {
+            socket = new WebSocket("ws://localhost:8000/ws/live/");
+
+            socket.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    var priceElement = document.getElementById("latest_price");
+
+                    if (data && data.close) {
+                        var newPrice = parseFloat(data.close);
+
+                        // Check price movement
+                        if (lastPrice !== null) {
+                            if (newPrice > lastPrice) {
+                                priceElement.style.color = "green";  // Price increased
+                            } else if (newPrice < lastPrice) {
+                                priceElement.style.color = "red";  // Price decreased
+                            } else {
+                                priceElement.style.color = "white"; // No change
+                            }
+                        }
+
+                        // Update displayed price
+                        priceElement.innerText = "Latest Price: $" + newPrice.toFixed(2);
+                        lastPrice = newPrice;
+                    }
+                } catch (error) {
+                    console.error("Error parsing WebSocket message:", error);
+                }
+            };
+
+            socket.onerror = function(error) {
+                console.error("WebSocket Error:", error);
+            };
+
+            socket.onclose = function() {
+                console.warn("WebSocket closed. Reconnecting in 1 seconds...");
+                setTimeout(connectWebSocket, 1000); // Reconnect after 3 seconds
+            };
+        }
+
+        // Initialize WebSocket Connection
+        connectWebSocket();
+    </script>
+</head>
+<body style="background-color: black; color: white;">
+    <h1>BTC/USDT Candlestick Chart</h1>
+    <h2 id="latest_price" style="transition: color 0.3s;">Loading...</h2>
+    {{ chart|safe }}
+</body>
+</html> {% endcomment %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BTC/USDT Live Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script>
+        var socket;
+        var lastPrice = null;
+        var chart;
+        var chartData = [];
+        var chartLabels = [];
+
+        function connectWebSocket() {
+            socket = new WebSocket("ws://localhost:8000/ws/binance/?symbol=BTCUSDT&timeframes=1m");
+
+            socket.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    var priceElement = document.getElementById("latest_price");
+
+                    if (data && data.close) {
+                        var newPrice = parseFloat(data.close);
+                        var timestamp = new Date(data.timestamp).toLocaleTimeString();
+
+                        // Log the received price
+                        console.log(`[LOG] Latest Price: $${newPrice.toFixed(2)} at ${timestamp}`);
+
+                        // Check price movement and update color
+                        if (lastPrice !== null) {
+                            if (newPrice > lastPrice) {
+                                priceElement.style.color = "green";  // Price increased
+                            } else if (newPrice < lastPrice) {
+                                priceElement.style.color = "red";  // Price decreased
+                            } else {
+                                priceElement.style.color = "white"; // No change
+                            }
+                        }
+
+                        // Update displayed price
+                        priceElement.innerText = `Latest Price: $${newPrice.toFixed(2)}`;
+                        lastPrice = newPrice;
+
+                        // Update chart data
+                        updateChart(timestamp, parseFloat(data.open), parseFloat(data.high), parseFloat(data.low), parseFloat(data.close));
+                    }
+                } catch (error) {
+                    console.error("[ERROR] Parsing WebSocket message:", error);
+                }
+            };
+
+            socket.onerror = function(error) {
+                console.error("[ERROR] WebSocket Error:", error);
+            };
+
+            socket.onclose = function() {
+                console.warn("[WARNING] WebSocket closed. Reconnecting in 1 second...");
+                setTimeout(connectWebSocket, 1000);
+            };
+        }
+
+        function updateChart(timestamp, open, high, low, close) {
+            if (chartData.length >= 30) { // Keep only last 30 candles
+                chartData.shift();
+                chartLabels.shift();
+            }
+
+            chartLabels.push(timestamp);
+            chartData.push({ x: timestamp, o: open, h: high, l: low, c: close });
+
+            chart.update();
+        }
+
+        function createChart() {
+            var ctx = document.getElementById("candlestickChart").getContext("2d");
+            chart = new Chart(ctx, {
+                type: "candlestick",
+                data: {
+                    datasets: [{
+                        label: "BTC/USDT",
+                        data: chartData,
+                        borderColor: "white",
+                        backgroundColor: "rgba(255, 255, 255, 0.5)",
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { type: "category", labels: chartLabels },
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+        }
+
+        window.onload = function() {
+            createChart();
+            connectWebSocket();
+        };
+    </script>
+</head>
+<body style="background-color: black; color: white;">
+    <h1>BTC/USDT Candlestick Chart</h1>
+    <h2 id="latest_price" style="transition: color 0.3s;">Loading...</h2>
+    <canvas id="candlestickChart" width="800" height="400"></canvas>
+</body>
+</html>
