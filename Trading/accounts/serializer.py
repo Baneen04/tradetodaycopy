@@ -87,6 +87,7 @@ from django.conf import settings
 from rest_framework import serializers
 from .models import CustomUser
 from django.core.exceptions import ValidationError
+from bson.objectid import ObjectId
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
@@ -115,41 +116,48 @@ class RegisterSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    plan_name = serializers.CharField(source="plan.name", read_only=True)  # Fetch plan name dynamically
-    start_date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False)
-    end_date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False)
+    id = serializers.CharField(read_only=True)
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    full_name = serializers.CharField(required=False, allow_null=True)
+    dob = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.CharField(required=False, allow_null=True)
+    bio = serializers.CharField(required=False, allow_null=True)
     profile_image_url = serializers.SerializerMethodField()
-    class Meta:
-        model = CustomUser
-        fields = [
-            "id",
-            "username",
-            "email",
-            "full_name",
-            "dob",
-            "gender",
-            "bio",
-            'profile_image_url',
-            "is_active",
-            "plan_name",
-            "price",
-            "is_active_subscription",
-            "start_date",
-            "end_date",
-            "stripe_price_id",
-            "stripe_subscription_id",
-            "created_at",
-        ]
+    is_active = serializers.BooleanField()
+    plan_name = serializers.CharField(source="plan.name", read_only=True, allow_null=True)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    is_active_subscription = serializers.BooleanField()
+    start_date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False, allow_null=True)
+    end_date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", required=False, allow_null=True)
+    stripe_price_id = serializers.CharField(required=False, allow_null=True)
+    stripe_subscription_id = serializers.CharField(required=False, allow_null=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
     def get_profile_image_url(self, obj):
-        """Return the full URL of the profile image, handling cases where request is None"""
         request = self.context.get("request")
         if obj.profile_image:
             if request:
                 return request.build_absolute_uri(obj.profile_image.url)
-            return settings.MEDIA_URL + obj.profile_image.url  # Fallback if no request
-        return None  # No image uploaded
-    
+            return settings.MEDIA_URL + obj.profile_image.url
+        return None
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Ensure ID is always a string
+        ret['id'] = str(instance.id)
+        return ret
+
+    def to_internal_value(self, data):
+        ret = super().to_internal_value(data)
+        # Convert string ID to ObjectId if present
+        if 'id' in ret and isinstance(ret['id'], str):
+            try:
+                ret['id'] = ObjectId(ret['id'])
+            except:
+                pass
+        return ret
+
 # ✅ Subscription Plan Serializer (Handles Plans Like Monthly, Yearly)
 class SubscriptionPlanSerializer(serializers.Serializer):
     class Meta:

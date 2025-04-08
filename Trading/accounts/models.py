@@ -407,12 +407,14 @@ from datetime import timedelta
 #         user.deactivate_subscription()
 #     print("✅ Expired subscriptions have been deactivated.")
 
-from mongoengine import Document, StringField, DecimalField, DateTimeField, BooleanField, ReferenceField, EmailField, ImageField
+from mongoengine import Document, StringField, EmailField, BooleanField, DateTimeField, DecimalField, ReferenceField, ImageField
+from mongoengine.fields import DateField
 from datetime import timedelta
 from django.contrib.auth.hashers import check_password, make_password
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
 from mongoengine.queryset.visitor import Q
+
 class SubscriptionPlan(Document):
     PLAN_TYPES = [("Monthly", "Monthly"), ("Yearly", "Yearly")]
 
@@ -477,40 +479,36 @@ def user_directory_path(instance, filename):
     return f"{instance.username}/{filename}"  # Store in media/username/
 
 class CustomUser(Document):
-
     username = StringField(max_length=150, unique=True)
     email = EmailField(unique=True)
     password = StringField(max_length=128)
 
     # Profile Fields
     full_name = StringField(max_length=255, blank=True, null=True)
-    dob = models.DateField(blank=True, null=True)
+    dob = DateField(blank=True, null=True)
     gender = StringField(max_length=10, choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')], blank=True, null=True)
     bio = StringField(blank=True, null=True)
-        # **Profile Image (Stored in DB and filesystem)**
-    profile_image = ImageField(upload_to=user_directory_path, blank=True, null=True)  
+    profile_image = ImageField(upload_to=user_directory_path, blank=True, null=True)
     last_login = DateTimeField(null=True, blank=True)
 
     is_active = BooleanField(default=True)
     is_staff = BooleanField(default=False)
     is_superuser = BooleanField(default=False)
 
-    # **Subscription Fields (Merged from UserSubscription)**
-    plan = ReferenceField(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True)  # Link to SubscriptionPlan
-    price = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Store price
-    is_active_subscription = BooleanField(default=False)  # Active subscription status
-    start_date = DateTimeField(null=True, blank=True)  # Subscription start date
-    end_date = DateTimeField(null=True, blank=True)  # Subscription end date
+    # Subscription Fields
+    plan = ReferenceField(SubscriptionPlan, null=True, blank=True)
+    price = DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    is_active_subscription = BooleanField(default=False)
+    start_date = DateTimeField(null=True, blank=True)
+    end_date = DateTimeField(null=True, blank=True)
 
     stripe_price_id = StringField(max_length=255, blank=True, null=True)
     stripe_subscription_id = StringField(max_length=255, null=True, blank=True)
 
-    created_at = DateTimeField(auto_now_add=True)  # Account creation timestamp
+    created_at = DateTimeField(auto_now_add=True)
 
     def set_password(self, raw_password):
-        # Hash the password before saving it to the database
         self.password = make_password(raw_password)
-
 
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
@@ -542,6 +540,24 @@ class CustomUser(Document):
         for user in expired_users:
             user.deactivate_subscription()
         print("✅ Expired subscriptions deactivated!")
+
+    # Add Django authentication interface methods
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_username(self):
+        return self.username
+
+    def get_full_name(self):
+        return self.full_name or self.username
+
+    def get_short_name(self):
+        return self.username
 
 # Call this function during application initialization or in a management command.
 create_default_subscription_plans()
@@ -618,7 +634,7 @@ create_default_subscription_plans()
 #     password = StringField(max_length=128)
 
 #     full_name = StringField(max_length=255, null=True)
-#     dob = DateTimeField(null=True)  # DateTimeField, but consider using DateField if you don’t need time
+#     dob = DateTimeField(null=True)  # DateTimeField, but consider using DateField if you don't need time
 #     gender = StringField(choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')], null=True)
 #     bio = StringField(null=True)
 #     profile_image = ImageField(null=True)  # Assuming it's a reference to an image

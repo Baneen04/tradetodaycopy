@@ -3,7 +3,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from accounts.authentication import MongoJWTAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from django.contrib.auth import authenticate, get_user_model
 from accounts.serializer import UserSerializer, RegisterSerializer, SubscriptionPlanSerializer, SubscriptionPlan
@@ -11,6 +11,8 @@ from django.utils.timezone import now
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from mongoengine.errors import DoesNotExist
+from bson import ObjectId
 
 # from .models import CustomUser
 from django.contrib.auth.hashers import check_password
@@ -108,7 +110,7 @@ class LoginView(APIView):
 # ✅ List All Users (Only for Admins)
 class UserListAPIView(generics.ListAPIView):
     permission_classes = [IsAdminUser]
-    authentication_classes = (JWTAuthentication,)
+    authentication_classes = (MongoJWTAuthentication,)
     queryset = CustomUser.objects.all().order_by("-is_staff")
     serializer_class = UserSerializer
 
@@ -116,7 +118,7 @@ class UserListAPIView(generics.ListAPIView):
 class UserDetailAPIView(RetrieveAPIView):
     """API View for fetching logged-in user details."""
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [MongoJWTAuthentication]
     serializer_class = UserSerializer
 
     def get_object(self):
@@ -127,7 +129,7 @@ class UserDetailAPIView(RetrieveAPIView):
 # ✅ Delete a User (Only Admins Can Delete Users)
 class UserDeleteAPIView(APIView):
     permission_classes = [IsAdminUser]
-    authentication_classes = (JWTAuthentication,)
+    authentication_classes = (MongoJWTAuthentication,)
 
     def delete(self, request, user_id):
         try:
@@ -193,7 +195,7 @@ class UserDeleteAPIView(APIView):
 
 class UserProfileUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [MongoJWTAuthentication]
 
     def put(self, request):
         user = request.user  # Authenticated MongoEngine user
@@ -209,10 +211,18 @@ class UserProfileUpdateAPIView(APIView):
             profile_image = request.FILES.get("profile_image")
 
             if email:
+                # Check if email is already taken by another user
+                existing_user = CustomUser.objects.filter(email=email).first()
+                if existing_user and str(existing_user.id) != str(user.id):
+                    return Response({"error": "Email already taken"}, status=status.HTTP_400_BAD_REQUEST)
                 user.email = email
             if full_name:
                 user.full_name = full_name
             if username:
+                # Check if username is already taken by another user
+                existing_user = CustomUser.objects.filter(username=username).first()
+                if existing_user and str(existing_user.id) != str(user.id):
+                    return Response({"error": "Username already taken"}, status=status.HTTP_400_BAD_REQUEST)
                 user.username = username
             if dob:
                 user.dob = dob
@@ -224,9 +234,13 @@ class UserProfileUpdateAPIView(APIView):
                 user.profile_image = profile_image
 
             user.save()
+            serialized_user = UserSerializer(user).data
+            # Ensure ID is properly serialized as string
+            serialized_user['id'] = str(user.id)
+            
             return Response({
                 "message": "Profile updated successfully",
-                "user": UserSerializer(user).data
+                "user": serialized_user
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -272,7 +286,7 @@ class SubscriptionPlanListCreateAPIView(generics.ListCreateAPIView):
     POST: Create a new subscription plan (Admin only)
     """
     permission_classes = [IsAuthenticated]
-    authentication_classes = (JWTAuthentication,)
+    authentication_classes = (MongoJWTAuthentication,)
     queryset = SubscriptionPlan.objects.all()
     serializer_class = SubscriptionPlanSerializer
 
@@ -300,7 +314,7 @@ class SubscriptionPlanDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SubscriptionPlan.objects.all()
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [IsAuthenticated]  # Require authentication for update & delete
-    authentication_classes = (JWTAuthentication,)
+    authentication_classes = (MongoJWTAuthentication,)
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)

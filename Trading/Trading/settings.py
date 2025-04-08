@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("secret_key")
+SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -186,15 +186,15 @@ CORS_ALLOW_METHODS = (
 #JWT TOKEN
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'accounts.authentication.MongoJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-
 from datetime import timedelta
+from rest_framework_simplejwt import settings as jwt_settings
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
@@ -203,10 +203,13 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('accounts.tokens.MongoAccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
 }
-
 
 ##KEYS
 API_KEY = os.getenv("API_KEY")
@@ -246,9 +249,15 @@ CACHES = {
 
 
 AUTHENTICATION_BACKENDS = [
-    'mongoengine.django.auth.MongoEngineBackend',  # ✅ Required for MongoEngine
-    'django.contrib.auth.backends.ModelBackend',  # Default Django backend
-    'accounts.authentication.MongoUserBackend',  # Your custom MongoDB authentication backend
-    'accounts.authentication.EmailAuthenticationBackend',  # ✅ Custom email-based authentication
-    'django.contrib.auth.backends.ModelBackend',
+    'accounts.authentication.MongoUserBackend',  # Custom MongoDB authentication backend
+    'accounts.authentication.EmailAuthenticationBackend',  # Custom email-based authentication
 ]
+
+# Add MongoEngine settings
+MONGODB_DATABASES = {
+    'default': {
+        'name': 'tradetoday',
+        'host': 'localhost',
+        'port': 27017,
+    }
+}
