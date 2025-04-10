@@ -23,5 +23,5 @@ from .hour24_views import h24_prediction
 from .acc_symbol import prediction_acc, prediction_30acc, prediction_1hacc
 from .sparkline_views import get_multiple_sparklines, get_sparkline_data
 
-from .min15_db import latest_prediction, start_prediction
+from .min15_db import symbol15_db_view, StorePredictionView, symbol30_db_view, Store30PredictionView, symbol1h_db_view, Store1hPredictionView
 

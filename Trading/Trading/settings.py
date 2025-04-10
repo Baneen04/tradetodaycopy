@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'accounts',
+    'django_celery_beat',
     # 'django.contrib.contenttypes',  # This is required for MongoDB
     # 'django_mongoengine',
     # 'mongoengine.django.mongo_auth', 
@@ -197,7 +198,7 @@ from datetime import timedelta
 from rest_framework_simplejwt import settings as jwt_settings
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -225,13 +226,19 @@ COIN_MARKET_KEY = os.getenv("COIN_MARKET_KEY")
 
 
 FRONTEND_URL= "http://localhost:8000"
-STRIPE_PUBLIC_KEY = "pk_test_51R3W3cANmUYVTJdRTrYlBl0CWYvNKqL6G15GSnw8mW8lK2tOPRnMTMr7A11rvdYxL9AC4pkGUOqRmMshq8A3ZJif00csv9IWxC"
-STRIPE_SECRET_KEY = "sk_test_51R3W3cANmUYVTJdR1yVibR5xafL1EwrQ16CpHTLjGVDG3EK0FUqiEU6Nu7wFkSUEXoC0FylNqTUd6D916rYNEWF700KoMfn04g"
-STRIPE_WEBHOOK_SECRET=" whsec_4bdb222335272e5b3dace8243d94d4168dfbbfc7c574b2e33927f8c14644f21a"
+STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET= os.getenv("STRIPE_WEBHOOK_SECRET")
 
 #For image saving
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+###CELERY
+CELERY_BROKER_URL =os.getenv('CELERY_BROKER_URL')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+# CELERY_BEAT_SCHEDULER = 'crypticron_trade.scheduler.MongoScheduler' 
 
 
 ##
@@ -254,10 +261,20 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Add MongoEngine settings
-MONGODB_DATABASES = {
-    'default': {
-        'name': 'tradetoday',
-        'host': 'localhost',
-        'port': 27017,
-    }
-}
+# MONGODB_DATABASES = {
+#     'default': {
+#         'name': 'tradetoday',
+#         'host': 'localhost',
+#         'port': 27017,
+#     }
+# }
+
+
+from mongoengine import connect
+connect(
+    db='trade_today',
+    host='localhost',
+    port=27017,
+    # alias='default'  # Ensure this alias is used for the connection
+)
+# connect('your_db_name', host='mongodb://localhost/your_db_name')  # Adjust this according to your MongoDB configuration

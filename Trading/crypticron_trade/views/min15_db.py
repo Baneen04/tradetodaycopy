@@ -1,89 +1,126 @@
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from crypticron_trade.models import Prediction, HistoricalData
+# from crypticron_trade.models import Prediction, HistoricalData
 import threading
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import time
-from crypticron_trade.utils.min_15m_db  import predict_15crypto  # This is your prediction function
+from crypticron_trade.utils.min_15m_db  import get_prediction_from_db, store_prediction 
+from crypticron_trade.utils.min_30m_db import get_30prediction_from_db, save30m_predictions
+from crypticron_trade.utils.h_1_db import save_symbol_1h, get_1prediction_from_db# This is your prediction function
 # Define a background task to run the prediction every 15 minutes
-def start_background_prediction():
-    while True:
-        predict_15crypto()  # Generate a prediction every 15 minutes
-        time.sleep(900)  # Sleep for 15 minutes (900 seconds)
+# def start_background_prediction():
+#     while True:
+#         predict_15crypto()  # Generate a prediction every 15 minutes
+#         time.sleep(900)  # Sleep for 15 minutes (900 seconds)
 
-@csrf_exempt
-def start_prediction(request):
-    try:
-        symbol = request.GET.get("symbol", "BTCUSDT")
-        # Step 1: Trigger immediate prediction
-        predict_15crypto(symbol)
-        print('saveed')
-        # Step 2: Start background prediction task
-        thread = threading.Thread(target=start_background_prediction)
-        thread.daemon = True  # Ensure the thread terminates when the main program exits
-        thread.start()
+# @csrf_exempt
+# def start_prediction(request):
+#     try:
+#         symbol = request.GET.get("symbol", "BTCUSDT")
+#         # Step 1: Trigger immediate prediction
+#         predict_15crypto(symbol)
+#         print('saveed')
+#         # Step 2: Start background prediction task
+#         thread = threading.Thread(target=start_background_prediction)
+#         thread.daemon = True  # Ensure the thread terminates when the main program exits
+#         thread.start()
 
-        return JsonResponse({"status": "success", "message": "Prediction started and background task running."})
+#         return JsonResponse({"status": "success", "message": "Prediction started and background task running."})
 
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+#     except Exception as e:
+#         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])    
-def latest_prediction(request):
-    try:
-        symbol = request.GET.get("symbol", "BTCUSDT")
-        # Get latest 15 prediction entries (most recent first)
-        predictions = Prediction.objects.filter(prediction_time="15min" , symbol=symbol).first()
-        results = []
-        results.append({
-                "predicted_price": predictions.predicted_price,
-                "timestamp": predictions.timestamp,
-                "tp1": predictions.tp1,
-                "tp2": predictions.tp2,
-                "sl": predictions.sl,
-                "confidence": predictions.confidence_percentage,
-                "confidence_interval": predictions.confidence_interval,
-                "last_actual_price": predictions.last_actual_price,
+@permission_classes([IsAuthenticated])  # Require JWT token
+def symbol15_db_view(request):
+    """
+    API endpoint to retrieve 15-minute price predictions for a given trading symbol.
 
-            })
-        historical = HistoricalData.objects.filter(prediction_time="15min" , symbol=symbol)
+    Query Parameters:
+        symbol (str): Trading symbol (default: BTCUSDT)
+        interval (str): Time interval (default: 15m)
 
-        historical_d = []
-        for item in historical:
-            historical_d.append({
-                    'timestamp':item.timestamp,
-                    'open_price':item.open_price,
-                    'high_price':item.high_price,
-                    'low_price':item.low_price,
-                    'close_price':item.close_price
+    Returns:
+        JsonResponse: JSON response containing predicted values.
+    """
+    symbol = request.GET.get("symbol", "BTCUSDT")  # Default symbol is BTCUSDT
+        # interval = request.GET.get("interval", "15m")  # Default interval is 15m
+    predictions = get_prediction_from_db(symbol)
 
-            })
-            # Try to fetch corresponding historical data
-            # historical = HistoricalData.objects.filter(
-            #     symbol=item.symbol,
-            #     timestamp=item.timestamp,
-            #     prediction_time="15min"
-            # ).first()
+    # if not isinstance(predictions, dict):  # Ensure predictions are JSON serializable
+    #     return JsonResponse({"error": "Invalid prediction format"}, status=500)
 
-            # historical_data = {
-            #     "open": historical.open_price if historical else None,
-            #     "high": historical.high_price if historical else None,
-            #     "low": historical.low_price if historical else None,
-            #     "close": historical.close_price if historical else None,
-            # } if historical else {}
+    return JsonResponse(predictions, status=200, safe=False)
 
-
-
-        return JsonResponse({
-            "status": "success",                
-            "symbol": symbol,
-            "last_actual_price":predictions.last_actual_price,
-            "last_time":predictions.last_time,
-            "historical_data": historical_d,
-            "prediction": results})
     
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+from django.views import View
+class StorePredictionView(View):
+    def get(self, request):
+        symbol = request.GET.get('symbol', 'BTCUSDT')  # Default to 'BTCUSDT' if no symbol is provided
+        store_prediction(symbol)  # Call store_prediction function with symbol
+        return JsonResponse({"message": "Prediction saved successfully!"})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])  # Require JWT token
+def symbol30_db_view(request):
+    """
+    API endpoint to retrieve 15-minute price predictions for a given trading symbol.
+
+    Query Parameters:
+        symbol (str): Trading symbol (default: BTCUSDT)
+        interval (str): Time interval (default: 15m)
+
+    Returns:
+        JsonResponse: JSON response containing predicted values.
+    """
+    symbol = request.GET.get("symbol", "BTCUSDT")  # Default symbol is BTCUSDT
+        # interval = request.GET.get("interval", "15m")  # Default interval is 15m
+    predictions = get_30prediction_from_db(symbol)
+
+    # if not isinstance(predictions, dict):  # Ensure predictions are JSON serializable
+    #     return JsonResponse({"error": "Invalid prediction format"}, status=500)
+
+    return JsonResponse(predictions, status=200, safe=False)
+
+    
+from django.views import View
+class Store30PredictionView(View):
+    def get(self, request):
+        symbol = request.GET.get('symbol', 'BTCUSDT')  # Default to 'BTCUSDT' if no symbol is provided
+        save30m_predictions(symbol)  # Call store_prediction function with symbol
+        return JsonResponse({"message": "Prediction saved successfully!"})
+    
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])  # Require JWT token
+def symbol1h_db_view(request):
+    """
+    API endpoint to retrieve 15-minute price predictions for a given trading symbol.
+
+    Query Parameters:
+        symbol (str): Trading symbol (default: BTCUSDT)
+        interval (str): Time interval (default: 15m)
+
+    Returns:
+        JsonResponse: JSON response containing predicted values.
+    """
+    symbol = request.GET.get("symbol", "BTCUSDT")  # Default symbol is BTCUSDT
+        # interval = request.GET.get("interval", "15m")  # Default interval is 15m
+    predictions = get_1prediction_from_db(symbol)
+
+    # if not isinstance(predictions, dict):  # Ensure predictions are JSON serializable
+    #     return JsonResponse({"error": "Invalid prediction format"}, status=500)
+
+    return JsonResponse(predictions, status=200, safe=False)
+
+    
+from django.views import View
+class Store1hPredictionView(View):
+    def get(self, request):
+        symbol = request.GET.get('symbol', 'BTCUSDT')  # Default to 'BTCUSDT' if no symbol is provided
+        save_symbol_1h(symbol)  # Call store_prediction function with symbol
+        return JsonResponse({"message": "Prediction saved successfully!"})

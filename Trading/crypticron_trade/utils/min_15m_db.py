@@ -1,6 +1,9 @@
 import requests
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 from datetime import datetime, timedelta, timezone
 from binance.client import Client
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -8,8 +11,9 @@ import praw  # Reddit API
 from django.conf import settings
 from sklearn.ensemble import RandomForestRegressor
 from scipy.stats import norm
-from crypticron_trade.models import HistoricalData, Prediction
-
+from crypticron_trade.models import PredictionResult  # adjust path accordingly
+from datetime import timezone
+from django.http import JsonResponse
 # Binance API Keys
 API_KEY = settings.API_KEY
 B_SECRET_KEY = settings.B_SECRET_KEY
@@ -98,9 +102,9 @@ def calculate_macd(df):
     return df
 
 #  Predict BTC Price for Next 15 Minutes
-def predict_15crypto(symbol="BTCUSDT"):
-    # Fetch live and historical data
-    historical_data = fetch_live_candlestick_data(symbol)
+def store_prediction(symbol="BTCUSDT"):
+    # Fetch Data
+    historical_data = fetch_live_candlestick_data(symbol)  # 1-minute data
     df = fetch_binance_data(symbol)
     df.set_index("timestamp", inplace=True)
 
@@ -110,34 +114,36 @@ def predict_15crypto(symbol="BTCUSDT"):
     df["EMA_10"] = df["close"].ewm(span=10, adjust=False).mean()
     df["EMA_50"] = df["close"].ewm(span=50, adjust=False).mean()
     df["Volatility"] = df["close"].rolling(window=10).std()
+
+    # Get Sentiment Scores
+    news_sentiment = analyze_sentiment(fetch_news())
+    reddit_sentiment = analyze_sentiment(fetch_reddit())
+    df["News_Sentiment"] = news_sentiment
+    df["Reddit_Sentiment"] = reddit_sentiment
+
+    # RSI & MACD
     df = calculate_rsi(df)
     df = calculate_macd(df)
 
-    # Add Sentiment
-    df["News_Sentiment"] = analyze_sentiment(fetch_news())
-    df["Reddit_Sentiment"] = analyze_sentiment(fetch_reddit())
-
-    # Prepare features
-    X = df[["SMA_10", "SMA_50", "EMA_10", "EMA_50", "Volatility", 
-            "News_Sentiment", "Reddit_Sentiment", "RSI", "MACD", "Signal"]]
+    # Normalize Sentiment Scores
+    X = df[["SMA_10", "SMA_50", "EMA_10", "EMA_50", "Volatility", "News_Sentiment", "Reddit_Sentiment", "RSI", "MACD", "Signal"]]
     y = df["close"]
 
-    # Train model
+    # Train Random Forest Regressor
     model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
     model.fit(X, y)
 
-    # Prediction setup
-    current_features = pd.DataFrame([X.iloc[-1]], columns=X.columns)
-    current_time = df.index[-1]
-    last_price = df["close"].iloc[-1]
-    errors_so_far = list(abs(y - model.predict(X)))
-
+    # Initialize Variables
     future_prices = []
     future_timestamps = []
     confidence_intervals = []
+    current_features = pd.DataFrame([X.iloc[-1]], columns=X.columns)
+    current_time = df.index[-1]
+    errors_so_far = list(abs(y - model.predict(X)))
 
+    # Prediction Loop for the next 15 minutes
     for i in range(15):
-        predicted_price = model.predict(current_features)[0]
+        predicted_price = model.predict(pd.DataFrame(current_features, columns=X.columns))[0]
 
         if len(errors_so_far) >= 15:
             rolling_std = np.std(errors_so_far[-15:])
@@ -146,56 +152,83 @@ def predict_15crypto(symbol="BTCUSDT"):
             upper_bound = predicted_price + margin_of_error
             confidence = 100 - (rolling_std / predicted_price * 100)
         else:
-            lower_bound = predicted_price
-            upper_bound = predicted_price
-            confidence = 100
+            lower_bound, upper_bound, confidence = predicted_price, predicted_price, 100
 
-        # Store prediction info
+        # Store Prediction Results
         future_timestamps.append(current_time + timedelta(minutes=1))
         future_prices.append(predicted_price)
         confidence_intervals.append((lower_bound, upper_bound, confidence))
 
-        # Update for next iteration
+        # Update errors dynamically
         if i > 0:
             errors_so_far.append(abs(future_prices[-1] - predicted_price))
+
+        # Update Features for Next Iteration
         new_features = current_features.copy()
         new_features.iloc[0, :-1] = new_features.iloc[0, 1:].values
         new_features.iloc[0, -1] = predicted_price
         current_features = new_features.copy()
+
+        # Increment Time for Next Prediction
         current_time += timedelta(minutes=1)
 
-    # Store historical data once
-    for data_point in historical_data:
-        timestamp = data_point["timestamp_utc"]
-        if not HistoricalData.objects.filter(timestamp=timestamp, symbol=symbol).exists():
-            HistoricalData.objects.create(
-                prediction_time="15min",
-                symbol=symbol,
-                timestamp=timestamp,
-                open_price=round(data_point["open"], 5),
-                high_price=round(data_point["high"], 5),
-                low_price=round(data_point["low"], 5),
-                close_price=round(data_point["close"], 5)
-            )
+    # Define the last price and calculate TP1, TP2, and SL
+    last_price = df["close"].iloc[-1]
+    tp1_values = [last_price + (abs(pred - last_price) * 0.5) for pred in future_prices]
+    tp2_values = [last_price + (abs(pred - last_price) * 1.0) for pred in future_prices]
+    sl_values = [last_price - (abs(pred - last_price) * 0.5) for pred in future_prices]
 
-    # Save all 15 predictions
-    for t, p, (l, u, cp) in zip(future_timestamps, future_prices, confidence_intervals):
-        diff = abs(p - last_price)
-        tp1 = last_price + (diff * 0.5 if p > last_price else -diff * 0.5)
-        tp2 = last_price + (diff * 1.0 if p > last_price else -diff * 1.0)
-        sl = last_price - (diff * 0.5 if p > last_price else -diff * 0.5)
+    # Prepare Data for DB Saving
+    prediction_time = "15min"
+    timestamps = future_timestamps
+    predicted_prices = future_prices
+    confidence_percentages = [conf for _, _, conf in confidence_intervals]
+    confidence_intervals = [[float(i) for i in p.split(" to ")] for p in [f"{lower} to {upper}" for lower, upper, _ in confidence_intervals]]
 
-        Prediction.objects.create(
-            prediction_time="15min",
-            symbol=symbol,
-            last_actual_price=round(last_price, 5),
-            last_time=t,
-            predicted_price=round(p, 5),
-            tp1=round(tp1, 5),
-            tp2=round(tp2, 5),
-            sl=round(sl, 5),
-            confidence_interval=f"{l:.5f} to {u:.5f}",
-            confidence_percentage=round(cp, 5)
-        )
-        print(f"Saved prediction at {t} → {p:.2f}")
+    # Save to MongoDB using MongoEngine's save method
+    prediction_result = PredictionResult(
+        prediction_time=prediction_time,
+        symbol=symbol,
+        last_actual_price=last_price,
+        last_time=datetime.strptime(historical_data[-1]["timestamp_utc"], "%Y-%m-%dT%H:%M:%S%z"),
+        timestamps=timestamps,
+        predicted_prices=predicted_prices,
+        tp1_values=tp1_values,
+        tp2_values=tp2_values,
+        sl_values=sl_values,
+        confidence_intervals=confidence_intervals,
+        confidence_percentages=confidence_percentages,
+        historical_data=historical_data,
+    )
+    prediction_result.save()  # Save to the database
 
+
+
+# Function to fetch the latest prediction from the DB
+def get_prediction_from_db(request, symbol="BTCUSDT"):
+    # Query for the most recent prediction
+    prediction = PredictionResult.objects(symbol=symbol).order_by("-created_at").first()
+
+    if not prediction:
+        return JsonResponse({"error": "No prediction found"}, status=404)
+
+    # Prepare predictions list to return in response
+    predictions = []
+    for i in range(len(prediction.timestamps)):
+        predictions.append({
+            "time": prediction.timestamps[i].strftime("%Y-%m-%d %H:%M:%S"),
+            "predicted_price": round(prediction.predicted_prices[i], 5),
+            "tp1": round(prediction.tp1_values[i], 5),
+            "tp2": round(prediction.tp2_values[i], 5),
+            "sl": round(prediction.sl_values[i], 5),
+            "confidence_interval": f"{prediction.confidence_intervals[i][0]:.5f} to {prediction.confidence_intervals[i][1]:.5f}",
+            "confidence_percentage": f"{prediction.confidence_percentages[i]:.5f}%"
+        })
+
+    return ({
+        "symbol": prediction.symbol,
+        "last_actual_price": float(prediction.last_actual_price),
+        "last_time": prediction.last_time.isoformat(),
+        "historical_data": prediction.historical_data,
+        "predictions": predictions
+    })

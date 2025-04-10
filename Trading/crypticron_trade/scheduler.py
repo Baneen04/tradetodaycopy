@@ -1,9 +1,9 @@
 # crypticron_trade/scheduler.py
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from crypticron_trade.utils.min_15m_db import predict_15crypto
+# from apscheduler.schedulers.background import BackgroundScheduler
+# from crypticron_trade.utils.min_15m_db import get_prediction_from_db
 
-def start():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(predict_15crypto, 'interval', minutes=15)
-    scheduler.start()
+# def start():
+#     scheduler = BackgroundScheduler()
+#     scheduler.add_job(get_prediction_from_db, 'interval', minutes=15)
+#     scheduler.start()

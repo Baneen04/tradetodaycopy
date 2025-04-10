@@ -1,5 +1,7 @@
 
 
+
+
 import requests
 import pandas as pd
 import numpy as np
@@ -126,15 +128,9 @@ def predict_15crypto(symbol="BTCUSDT"):
     df = calculate_macd(df)
 
     # Normalize Sentiment Scores
-    # news_sentiment = (analyze_sentiment(fetch_news()) + 1) / 2
-    # reddit_sentiment = (analyze_sentiment(fetch_reddit()) + 1) / 2
-    # df["News_Sentiment"] = news_sentiment
-    # df["Reddit_Sentiment"] = reddit_sentiment
-    # Train Model
-    # X = df[["SMA_10", "SMA_50", "EMA_10", "EMA_50", "Volatility", "News_Sentiment", "Reddit_Sentiment"]]
+ 
     X = df[["SMA_10", "SMA_50", "EMA_10", "EMA_50", "Volatility","News_Sentiment", "Reddit_Sentiment", "RSI", "MACD", "Signal"]]
     y = df["close"]
-    # model = RandomForestRegressor(n_estimators=55, max_depth=6, random_state=60)
     model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
 
     model.fit(X, y)
@@ -163,15 +159,10 @@ def predict_15crypto(symbol="BTCUSDT"):
             lower_bound = predicted_price - margin_of_error
             upper_bound = predicted_price + margin_of_error
             # print(lower_bound, upper_bound)
-            confidence = (rolling_std / predicted_price * 100)
+
+            confidence = 100 - (rolling_std / predicted_price * 100)
         else:
             lower_bound, upper_bound, confidence = predicted_price, predicted_price, 100  # Default confidence
-        # lower_bound = predicted_price - 2 * std_dev
-        # upper_bound = predicted_price + 2 * std_dev
-
-        # # Compute Confidence Percentage
-        # z_score = abs(predicted_price - last_price) / std_dev if std_dev > 0 else 0
-        # confidence= (1 - 2 * norm.sf(z_score)) * 100  # Two-tailed probability
 
         # Store results
         future_timestamps.append(current_time + timedelta(minutes=1))
@@ -202,16 +193,16 @@ def predict_15crypto(symbol="BTCUSDT"):
 
         predictions.append({
             "time": t.strftime("%Y-%m-%d %H:%M:%S"),
-            "predicted_price": round(p, 2),
-            "tp1": round(tp1, 2),
-            "tp2": round(tp2, 2),
-            "sl": round(sp, 2),
-            "confidence_interval": f"{l:.2f} to {u:.2f}",
-            "confidence_percentage": f"{cp:.2f}%",
+            "predicted_price": round(p, 5),
+            "tp1": round(tp1, 5),
+            "tp2": round(tp2, 5),
+            "sl": round(sp, 5),
+            "confidence_interval": f"{l:.5f} to {u:.5f}",
+            "confidence_percentage": f"{cp:.5f}%",
         })
 
     return {
-        "last_actual_price": f"${df['close'].iloc[-1]:,.2f}",
+        "last_actual_price": round(last_price, 5),
         "last_time": historical_data[-1]["timestamp_utc"] if historical_data else "N/A",
         "historical_data": historical_data,
         "predictions": predictions

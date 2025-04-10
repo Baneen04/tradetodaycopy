@@ -46,9 +46,12 @@ from .views import (
     h24_prediction,
     get_sparkline_data,
     get_multiple_sparklines,
-
-    latest_prediction,
-    start_prediction,
+    symbol15_db_view,
+    StorePredictionView,
+    symbol30_db_view,
+    Store30PredictionView,
+    Store1hPredictionView,
+    symbol1h_db_view,
 )    
 
 urlpatterns = [
@@ -124,8 +127,13 @@ urlpatterns = [
     path('sparkline/', get_sparkline_data, name='sparkline'),
     path('sparklines/', get_multiple_sparklines, name='multiple_sparklines'),
 
-    path('15min/', latest_prediction, name='15min_live_prediction'),
-    path('start-prediction/', start_prediction, name='start_prediction'),
+    # path('15min/', latest_prediction, name='15min_live_prediction'),
+    # path('start-prediction/', start_prediction, name='start_prediction'),
+    path('15min/', symbol15_db_view, name='15min_live_prediction'),
+    path('store/', StorePredictionView.as_view()),
+    path('30min/', symbol30_db_view, name='30min_live_prediction'),
+    path('30store/', Store30PredictionView.as_view()),
+    path('1h/', symbol1h_db_view, name='15min_live_prediction'),
+    path('1store/', Store1hPredictionView.as_view()),
 ]
-
 

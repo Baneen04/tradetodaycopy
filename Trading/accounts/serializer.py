@@ -1,89 +1,6 @@
 # accounts/serializers.py
-from rest_framework import serializers
-from .models import CustomUser
-from django.conf import settings
-# class RegisterSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CustomUser
-#         fields = ('id', 'username', 'email', 'password')
-#         extra_kwargs = {
-#             'password': {'write_only': True}
-#         }
-
-#     def create(self, validated_data):
-#         user = CustomUser.objects.create_user(
-#             username=validated_data['username'],
-#             email=validated_data['email'],
-#             password=validated_data['password']
-#         )
-#         return user
-# from rest_framework import serializers
-# from .models import CustomUser,SubscriptionPlan
-
-# class RegisterSerializer(serializers.ModelSerializer):
-#     is_superuser = serializers.BooleanField(default=False)  # Allow superuser creation
-
-#     class Meta:
-#         model = CustomUser
-#         fields = ('id', 'username', 'email', 'password', 'is_superuser')
-#         extra_kwargs = {
-#             'password': {'write_only': True}
-#         }
-
-#     def create(self, validated_data):
-#         is_superuser = validated_data.pop('is_superuser', False)  # Extract superuser flag
-
-#         user = CustomUser.objects.create_user(
-#             username=validated_data['username'],
-#             email=validated_data['email'],
-#             password=validated_data['password']
-#         )
-
-#         if is_superuser:
-#             user.is_superuser = True
-#             user.is_staff = True  # Required to access Django admin
-#             user.save()
-
-#         return user
-
-# class UserSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CustomUser
-#         fields = ('id', 'username', 'email', 'is_superuser')
-
-# class UserSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CustomUser
-#         fields = ['id', 'username', 'email', 'full_name', 'dob', 'gender', 'bio']
- 
-from rest_framework import serializers
 from .models import CustomUser,SubscriptionPlan
 from django.conf import settings
-# class RegisterSerializer(serializers.ModelSerializer):
-#     is_superuser = serializers.BooleanField(default=False)  # Allow superuser creation
-
-#     class Meta:
-#         model = CustomUser
-#         fields = ('id', 'username', 'email', 'password', 'is_superuser')
-#         extra_kwargs = {
-#             'password': {'write_only': True}
-#         }
-
-#     def create(self, validated_data):
-#         is_superuser = validated_data.pop('is_superuser', False)  # Extract superuser flag
-
-#         user = CustomUser.objects.create_user(
-#             username=validated_data['username'],
-#             email=validated_data['email'],
-#             password=validated_data['password']
-#         )
-
-#         if is_superuser:
-#             user.is_superuser = True
-#             user.is_staff = True  # Required to access Django admin
-#             user.save()
-
-#         return user
 from rest_framework import serializers
 from .models import CustomUser
 from django.core.exceptions import ValidationError
@@ -134,12 +51,22 @@ class UserSerializer(serializers.Serializer):
     stripe_subscription_id = serializers.CharField(required=False, allow_null=True)
     created_at = serializers.DateTimeField(read_only=True)
 
+    # def get_profile_image_url(self, obj):
+    #     request = self.context.get("request")
+    #     if obj.profile_image:
+    #         if request:
+    #             return request.build_absolute_uri(obj.profile_image.url)
+    #         return settings.MEDIA_URL + obj.profile_image.url
+    #     return None
     def get_profile_image_url(self, obj):
         request = self.context.get("request")
-        if obj.profile_image:
-            if request:
-                return request.build_absolute_uri(obj.profile_image.url)
-            return settings.MEDIA_URL + obj.profile_image.url
+        try:
+            if obj.profile_image and hasattr(obj.profile_image, 'url'):
+                if request:
+                    return request.build_absolute_uri(obj.profile_image.url)
+                return settings.MEDIA_URL + obj.profile_image.url
+        except Exception:
+            return None
         return None
 
     def to_representation(self, instance):
